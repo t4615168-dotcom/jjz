@@ -1,4 +1,3 @@
--- Load Rayfield Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Players = game:GetService("Players")
@@ -10,7 +9,6 @@ local Character = LocalPlayer.Character
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 
--- Settings
 local Settings = {
     AutoFarm    = false,
     AutoRaid    = false,
@@ -25,28 +23,27 @@ local Settings = {
     SkillDelay  = 0.5,
 }
 
--- Create Window
 local Window = Rayfield:CreateWindow({
     Name = "JJZ AutoFarm",
     LoadingTitle = "JJZ AutoFarm",
-    LoadingSubtitle = "by script",
+    LoadingSubtitle = "Loading...",
     Theme = "Default",
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
 })
 
--- Combat Tab
-local CombatTab = Window:CreateTab("Combat", 4483362458)
+local CombatTab = Window:CreateTab("Combat")
+local SkillsTab = Window:CreateTab("Skills")
 
-CombatTab:CreateSection("Auto Combat")
+CombatTab:CreateSection("Combat")
 
 CombatTab:CreateToggle({
     Name = "Auto Farm",
     CurrentValue = false,
     Flag = "AutoFarm",
-    Callback = function(value)
-        Settings.AutoFarm = value
-        if value then Settings.AutoRaid = false end
+    Callback = function(v)
+        Settings.AutoFarm = v
+        if v then Settings.AutoRaid = false end
     end,
 })
 
@@ -54,9 +51,9 @@ CombatTab:CreateToggle({
     Name = "Auto Raid Kill",
     CurrentValue = false,
     Flag = "AutoRaid",
-    Callback = function(value)
-        Settings.AutoRaid = value
-        if value then Settings.AutoFarm = false end
+    Callback = function(v)
+        Settings.AutoRaid = v
+        if v then Settings.AutoFarm = false end
     end,
 })
 
@@ -69,8 +66,8 @@ CombatTab:CreateSlider({
     Suffix = "studs",
     CurrentValue = 150,
     Flag = "FarmRadius",
-    Callback = function(value)
-        Settings.FarmRadius = value
+    Callback = function(v)
+        Settings.FarmRadius = v
     end,
 })
 
@@ -81,8 +78,8 @@ CombatTab:CreateSlider({
     Suffix = "studs",
     CurrentValue = 10,
     Flag = "AttackRange",
-    Callback = function(value)
-        Settings.AttackRange = value
+    Callback = function(v)
+        Settings.AttackRange = v
     end,
 })
 
@@ -93,102 +90,61 @@ CombatTab:CreateSlider({
     Suffix = "speed",
     CurrentValue = 50,
     Flag = "WalkSpeed",
-    Callback = function(value)
-        Settings.WalkSpeed = value
-        if Humanoid then
-            Humanoid.WalkSpeed = value
-        end
+    Callback = function(v)
+        Settings.WalkSpeed = v
+        if Humanoid then Humanoid.WalkSpeed = v end
     end,
 })
-
--- Skills Tab
-local SkillsTab = Window:CreateTab("Skills", 4483362458)
 
 SkillsTab:CreateSection("Auto Skills")
 
 SkillsTab:CreateToggle({
-    Name = "Auto Skill [R]",
+    Name = "Auto Skill R",
     CurrentValue = false,
     Flag = "AutoSkillR",
-    Callback = function(value)
-        Settings.AutoSkillR = value
-    end,
+    Callback = function(v) Settings.AutoSkillR = v end,
 })
 
 SkillsTab:CreateToggle({
-    Name = "Auto Skill [F]",
+    Name = "Auto Skill F",
     CurrentValue = false,
     Flag = "AutoSkillF",
-    Callback = function(value)
-        Settings.AutoSkillF = value
-    end,
+    Callback = function(v) Settings.AutoSkillF = v end,
 })
 
 SkillsTab:CreateToggle({
-    Name = "Auto Skill [C]",
+    Name = "Auto Skill C",
     CurrentValue = false,
     Flag = "AutoSkillC",
-    Callback = function(value)
-        Settings.AutoSkillC = value
-    end,
+    Callback = function(v) Settings.AutoSkillC = v end,
 })
 
 SkillsTab:CreateToggle({
-    Name = "Auto Skill [X]",
+    Name = "Auto Skill X",
     CurrentValue = false,
     Flag = "AutoSkillX",
-    Callback = function(value)
-        Settings.AutoSkillX = value
-    end,
+    Callback = function(v) Settings.AutoSkillX = v end,
 })
 
 SkillsTab:CreateToggle({
-    Name = "Auto Skill [T]",
+    Name = "Auto Skill T",
     CurrentValue = false,
     Flag = "AutoSkillT",
-    Callback = function(value)
-        Settings.AutoSkillT = value
-    end,
+    Callback = function(v) Settings.AutoSkillT = v end,
 })
-
-SkillsTab:CreateSection("Skill Settings")
 
 SkillsTab:CreateSlider({
     Name = "Skill Delay",
-    Range = {0.1, 3},
-    Increment = 0.1,
-    Suffix = "s",
-    CurrentValue = 0.5,
+    Range = {1, 30},
+    Increment = 1,
+    Suffix = "x10ms",
+    CurrentValue = 5,
     Flag = "SkillDelay",
-    Callback = function(value)
-        Settings.SkillDelay = value
+    Callback = function(v)
+        Settings.SkillDelay = v / 10
     end,
 })
 
--- Info Tab
-local InfoTab = Window:CreateTab("Info", 4483362458)
-
-InfoTab:CreateSection("Status")
-
-local StatusParagraph = InfoTab:CreateParagraph({
-    Title = "Current Status",
-    Content = "Idle"
-})
-
-local function SetStatus(msg)
-    StatusParagraph:Set({
-        Title = "Current Status",
-        Content = msg
-    })
-end
-
-InfoTab:CreateSection("About")
-InfoTab:CreateParagraph({
-    Title = "JJZ AutoFarm",
-    Content = "Auto Farm - Kills nearby enemies\nAuto Raid Kill - Clears all enemies in current raid\nAuto Skills - Auto uses R F C X T skills"
-})
-
--- Utilities
 local function GetDistance(p1, p2)
     return (p1 - p2).Magnitude
 end
@@ -239,20 +195,15 @@ local function DoRaidKill()
             table.insert(enemies, model)
         end
     end
-    if #enemies == 0 then
-        SetStatus("Raid: No enemies found")
-        return
-    end
+    if #enemies == 0 then return end
     table.sort(enemies, function(a, b)
         return GetDistance(HumanoidRootPart.Position, a.HumanoidRootPart.Position)
              < GetDistance(HumanoidRootPart.Position, b.HumanoidRootPart.Position)
     end)
-    SetStatus("Raid: Killing " .. #enemies .. " enemies")
     local target = enemies[1]
     if target and target.Humanoid.Health > 0 then AttackEnemy(target) end
 end
 
--- Auto Skill
 local VIM = game:GetService("VirtualInputManager")
 local SkillKeys = {
     { key = "AutoSkillR", code = Enum.KeyCode.R },
@@ -270,7 +221,7 @@ local function FireSkills()
         if Settings[s.key] and (now - lastSkillTime[s.key]) >= Settings.SkillDelay then
             lastSkillTime[s.key] = now
             pcall(function()
-                VIM:SendKeyEvent(true,  s.code, false, game)
+                VIM:SendKeyEvent(true, s.code, false, game)
                 task.wait(0.05)
                 VIM:SendKeyEvent(false, s.code, false, game)
             end)
@@ -278,39 +229,29 @@ local function FireSkills()
     end
 end
 
--- Respawn Handler
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
     Humanoid = char:WaitForChild("Humanoid")
     Humanoid.WalkSpeed = Settings.WalkSpeed
-    SetStatus("Respawned")
 end)
 
 Humanoid.WalkSpeed = Settings.WalkSpeed
 
--- Main Loop
 RunService.Heartbeat:Connect(function()
     if not Character or not Humanoid then return end
     if Humanoid.Health <= 0 then return end
     if Settings.AutoFarm then
         local enemy = GetNearestEnemy()
-        if enemy then
-            AttackEnemy(enemy)
-            SetStatus("Farming: " .. enemy.Name)
-        else
-            SetStatus("Farming: Searching...")
-        end
+        if enemy then AttackEnemy(enemy) end
     elseif Settings.AutoRaid then
         DoRaidKill()
-    else
-        SetStatus("Idle")
     end
     FireSkills()
 end)
 
 Rayfield:Notify({
     Title = "JJZ AutoFarm",
-    Content = "Script loaded successfully!",
+    Content = "Loaded successfully!",
     Duration = 5,
 })
