@@ -1,4 +1,5 @@
-local ok, err = pcall(function()
+-- Load Rayfield Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,6 +10,7 @@ local Character = LocalPlayer.Character
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 
+-- Settings
 local Settings = {
     AutoFarm    = false,
     AutoRaid    = false,
@@ -23,156 +25,170 @@ local Settings = {
     SkillDelay  = 0.5,
 }
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "JJZAutoFarm"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game:GetService("CoreGui")
-print("[JJZ] ScreenGui created")
+-- Create Window
+local Window = Rayfield:CreateWindow({
+    Name = "JJZ AutoFarm",
+    LoadingTitle = "JJZ AutoFarm",
+    LoadingSubtitle = "by script",
+    Theme = "Default",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+})
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 230, 0, 410)
-MainFrame.Position = UDim2.new(0.5, -115, 0.5, -205)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-print("[JJZ] MainFrame created")
+-- Combat Tab
+local CombatTab = Window:CreateTab("Combat", 4483362458)
 
-local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(80, 0, 180)
-Stroke.Thickness = 1.5
-Stroke.Parent = MainFrame
+CombatTab:CreateSection("Auto Combat")
 
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 36)
-TitleBar.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = MainFrame
-Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
+CombatTab:CreateToggle({
+    Name = "Auto Farm",
+    CurrentValue = false,
+    Flag = "AutoFarm",
+    Callback = function(value)
+        Settings.AutoFarm = value
+        if value then Settings.AutoRaid = false end
+    end,
+})
 
-local TitleFix = Instance.new("Frame")
-TitleFix.Size = UDim2.new(1, 0, 0.5, 0)
-TitleFix.Position = UDim2.new(0, 0, 0.5, 0)
-TitleFix.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
-TitleFix.BorderSizePixel = 0
-TitleFix.Parent = TitleBar
+CombatTab:CreateToggle({
+    Name = "Auto Raid Kill",
+    CurrentValue = false,
+    Flag = "AutoRaid",
+    Callback = function(value)
+        Settings.AutoRaid = value
+        if value then Settings.AutoFarm = false end
+    end,
+})
 
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Text = "⚡ JJZ AutoFarm"
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.TextSize = 15
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleLabel.Size = UDim2.new(1, 0, 1, 0)
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Parent = TitleBar
-print("[JJZ] TitleBar created")
+CombatTab:CreateSection("Settings")
 
-local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 28, 0, 28)
-MinBtn.Position = UDim2.new(1, -32, 0, 4)
-MinBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 140)
-MinBtn.BorderSizePixel = 0
-MinBtn.Text = "-"
-MinBtn.Font = Enum.Font.GothamBold
-MinBtn.TextSize = 16
-MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinBtn.Parent = TitleBar
-Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 6)
+CombatTab:CreateSlider({
+    Name = "Farm Radius",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "studs",
+    CurrentValue = 150,
+    Flag = "FarmRadius",
+    Callback = function(value)
+        Settings.FarmRadius = value
+    end,
+})
 
-local ContentFrame = Instance.new("Frame")
-ContentFrame.Size = UDim2.new(1, 0, 1, -36)
-ContentFrame.Position = UDim2.new(0, 0, 0, 36)
-ContentFrame.BackgroundTransparency = 1
-ContentFrame.Parent = MainFrame
+CombatTab:CreateSlider({
+    Name = "Attack Range",
+    Range = {5, 50},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = 10,
+    Flag = "AttackRange",
+    Callback = function(value)
+        Settings.AttackRange = value
+    end,
+})
 
-local minimized = false
-MinBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    ContentFrame.Visible = not minimized
-    MainFrame.Size = minimized and UDim2.new(0, 230, 0, 36) or UDim2.new(0, 230, 0, 410)
-    MinBtn.Text = minimized and "+" or "-"
-end)
-
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Text = "● Idle"
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextSize = 10
-StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0, 0, 1, -22)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Parent = ContentFrame
-
-local function SetStatus(msg, color)
-    StatusLabel.Text = "● " .. msg
-    StatusLabel.TextColor3 = color or Color3.fromRGB(150, 150, 150)
-end
-
-local function CreateSection(parent, text, yPos)
-    local lbl = Instance.new("TextLabel")
-    lbl.Text = text
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 10
-    lbl.TextColor3 = Color3.fromRGB(130, 80, 220)
-    lbl.Size = UDim2.new(0.88, 0, 0, 16)
-    lbl.Position = UDim2.new(0.06, 0, 0, yPos)
-    lbl.BackgroundTransparency = 1
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = parent
-end
-
-local function CreateToggle(parent, label, yPos, settingKey)
-    local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0.88, 0, 0, 34)
-    Btn.Position = UDim2.new(0.06, 0, 0, yPos)
-    Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    Btn.BorderSizePixel = 0
-    Btn.Font = Enum.Font.GothamSemibold
-    Btn.TextSize = 12
-    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    Btn.Text = "[OFF] " .. label
-    Btn.TextXAlignment = Enum.TextXAlignment.Left
-    Btn.AutoButtonColor = false
-    Btn.Parent = parent
-    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
-
-    local BtnStroke = Instance.new("UIStroke")
-    BtnStroke.Color = Color3.fromRGB(60, 60, 80)
-    BtnStroke.Thickness = 1
-    BtnStroke.Parent = Btn
-
-    local Pad = Instance.new("UIPadding")
-    Pad.PaddingLeft = UDim.new(0, 10)
-    Pad.Parent = Btn
-
-    Btn.MouseButton1Click:Connect(function()
-        Settings[settingKey] = not Settings[settingKey]
-        if Settings[settingKey] then
-            Btn.Text = "[ON]  " .. label
-            Btn.BackgroundColor3 = Color3.fromRGB(25, 40, 25)
-            BtnStroke.Color = Color3.fromRGB(0, 200, 80)
-        else
-            Btn.Text = "[OFF] " .. label
-            Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-            BtnStroke.Color = Color3.fromRGB(60, 60, 80)
+CombatTab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 100},
+    Increment = 1,
+    Suffix = "speed",
+    CurrentValue = 50,
+    Flag = "WalkSpeed",
+    Callback = function(value)
+        Settings.WalkSpeed = value
+        if Humanoid then
+            Humanoid.WalkSpeed = value
         end
-    end)
+    end,
+})
+
+-- Skills Tab
+local SkillsTab = Window:CreateTab("Skills", 4483362458)
+
+SkillsTab:CreateSection("Auto Skills")
+
+SkillsTab:CreateToggle({
+    Name = "Auto Skill [R]",
+    CurrentValue = false,
+    Flag = "AutoSkillR",
+    Callback = function(value)
+        Settings.AutoSkillR = value
+    end,
+})
+
+SkillsTab:CreateToggle({
+    Name = "Auto Skill [F]",
+    CurrentValue = false,
+    Flag = "AutoSkillF",
+    Callback = function(value)
+        Settings.AutoSkillF = value
+    end,
+})
+
+SkillsTab:CreateToggle({
+    Name = "Auto Skill [C]",
+    CurrentValue = false,
+    Flag = "AutoSkillC",
+    Callback = function(value)
+        Settings.AutoSkillC = value
+    end,
+})
+
+SkillsTab:CreateToggle({
+    Name = "Auto Skill [X]",
+    CurrentValue = false,
+    Flag = "AutoSkillX",
+    Callback = function(value)
+        Settings.AutoSkillX = value
+    end,
+})
+
+SkillsTab:CreateToggle({
+    Name = "Auto Skill [T]",
+    CurrentValue = false,
+    Flag = "AutoSkillT",
+    Callback = function(value)
+        Settings.AutoSkillT = value
+    end,
+})
+
+SkillsTab:CreateSection("Skill Settings")
+
+SkillsTab:CreateSlider({
+    Name = "Skill Delay",
+    Range = {0.1, 3},
+    Increment = 0.1,
+    Suffix = "s",
+    CurrentValue = 0.5,
+    Flag = "SkillDelay",
+    Callback = function(value)
+        Settings.SkillDelay = value
+    end,
+})
+
+-- Info Tab
+local InfoTab = Window:CreateTab("Info", 4483362458)
+
+InfoTab:CreateSection("Status")
+
+local StatusParagraph = InfoTab:CreateParagraph({
+    Title = "Current Status",
+    Content = "Idle"
+})
+
+local function SetStatus(msg)
+    StatusParagraph:Set({
+        Title = "Current Status",
+        Content = msg
+    })
 end
 
-print("[JJZ] Building buttons...")
-CreateSection(ContentFrame, "-- COMBAT --", 6)
-CreateToggle(ContentFrame, "Auto Farm",      26,  "AutoFarm")
-CreateToggle(ContentFrame, "Auto Raid Kill", 66,  "AutoRaid")
-CreateSection(ContentFrame, "-- SKILLS --", 110)
-CreateToggle(ContentFrame, "Auto Skill R",  130, "AutoSkillR")
-CreateToggle(ContentFrame, "Auto Skill F",  170, "AutoSkillF")
-CreateToggle(ContentFrame, "Auto Skill C",  210, "AutoSkillC")
-CreateToggle(ContentFrame, "Auto Skill X",  250, "AutoSkillX")
-CreateToggle(ContentFrame, "Auto Skill T",  290, "AutoSkillT")
-print("[JJZ] GUI fully built!")
+InfoTab:CreateSection("About")
+InfoTab:CreateParagraph({
+    Title = "JJZ AutoFarm",
+    Content = "Auto Farm - Kills nearby enemies\nAuto Raid Kill - Clears all enemies in current raid\nAuto Skills - Auto uses R F C X T skills"
+})
 
+-- Utilities
 local function GetDistance(p1, p2)
     return (p1 - p2).Magnitude
 end
@@ -224,18 +240,19 @@ local function DoRaidKill()
         end
     end
     if #enemies == 0 then
-        SetStatus("Raid: No enemies found", Color3.fromRGB(255, 200, 0))
+        SetStatus("Raid: No enemies found")
         return
     end
     table.sort(enemies, function(a, b)
         return GetDistance(HumanoidRootPart.Position, a.HumanoidRootPart.Position)
              < GetDistance(HumanoidRootPart.Position, b.HumanoidRootPart.Position)
     end)
-    SetStatus("Raid: Killing " .. #enemies .. " enemies", Color3.fromRGB(255, 80, 80))
+    SetStatus("Raid: Killing " .. #enemies .. " enemies")
     local target = enemies[1]
     if target and target.Humanoid.Health > 0 then AttackEnemy(target) end
 end
 
+-- Auto Skill
 local VIM = game:GetService("VirtualInputManager")
 local SkillKeys = {
     { key = "AutoSkillR", code = Enum.KeyCode.R },
@@ -261,16 +278,18 @@ local function FireSkills()
     end
 end
 
+-- Respawn Handler
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
     Humanoid = char:WaitForChild("Humanoid")
     Humanoid.WalkSpeed = Settings.WalkSpeed
-    SetStatus("Respawned", Color3.fromRGB(100, 200, 255))
+    SetStatus("Respawned")
 end)
 
 Humanoid.WalkSpeed = Settings.WalkSpeed
 
+-- Main Loop
 RunService.Heartbeat:Connect(function()
     if not Character or not Humanoid then return end
     if Humanoid.Health <= 0 then return end
@@ -278,22 +297,20 @@ RunService.Heartbeat:Connect(function()
         local enemy = GetNearestEnemy()
         if enemy then
             AttackEnemy(enemy)
-            SetStatus("Farming: " .. enemy.Name, Color3.fromRGB(0, 220, 100))
+            SetStatus("Farming: " .. enemy.Name)
         else
-            SetStatus("Farming: Searching...", Color3.fromRGB(200, 200, 0))
+            SetStatus("Farming: Searching...")
         end
     elseif Settings.AutoRaid then
         DoRaidKill()
     else
-        SetStatus("Idle", Color3.fromRGB(150, 150, 150))
+        SetStatus("Idle")
     end
     FireSkills()
 end)
 
-end)
-
--- Show error if something went wrong
-if not ok then
-    warn("[JJZ ERROR]: " .. tostring(err))
-    print("[JJZ ERROR]: " .. tostring(err))
-end
+Rayfield:Notify({
+    Title = "JJZ AutoFarm",
+    Content = "Script loaded successfully!",
+    Duration = 5,
+})
