@@ -1,217 +1,180 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+_G.Rayfield = Rayfield
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
-
-repeat task.wait() until LocalPlayer.Character
-local Character = LocalPlayer.Character
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-local Humanoid = Character:WaitForChild("Humanoid")
-
-local Settings = {
-    AutoFarm    = false,
-    AutoRaid    = false,
-    AutoSkillR  = false,
-    AutoSkillF  = false,
-    AutoSkillC  = false,
-    AutoSkillX  = false,
-    AutoSkillT  = false,
-    FarmRadius  = 150,
-    AttackRange = 10,
-    WalkSpeed   = 50,
-    SkillDelay  = 0.5,
+_G.Settings = {
+    AutoFarm = false,
+    AutoRaid = false,
+    AutoSkillR = false, AutoSkillF = false, AutoSkillC = false,
+    AutoSkillX = false, AutoSkillT = false,
+    FarmRadius = 200,
+    HoverHeight = 10,
+    SkillDelay = 0.8,
+    WalkSpeed = 60,
+    TargetType = "All"
 }
 
-local Window = Rayfield:CreateWindow({
-    Name = "JJZ AutoFarm",
-    LoadingTitle = "JJZ AutoFarm",
-    LoadingSubtitle = "Loading...",
-    Theme = "Default",
-    DisableRayfieldPrompts = false,
-    DisableBuildWarnings = false,
-})
+local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm", LoadingTitle = "JJZ AutoFarm", LoadingSubtitle = "by Grok", Theme = "Default"})
 
 local CombatTab = Window:CreateTab("Combat")
 local SkillsTab = Window:CreateTab("Skills")
 
 CombatTab:CreateSection("Combat")
+CombatTab:CreateToggle({Name = "Auto Farm", CurrentValue = false, Callback = function(v)
+    _G.Settings.AutoFarm = v
+    if v then _G.Settings.AutoRaid = false end
+end})
 
-CombatTab:CreateToggle({
-    Name = "Auto Farm",
-    CurrentValue = false,
-    Flag = "AutoFarm",
-    Callback = function(v)
-        Settings.AutoFarm = v
-        if v then Settings.AutoRaid = false end
-    end,
-})
+CombatTab:CreateToggle({Name = "Auto Raid Kill", CurrentValue = false, Callback = function(v)
+    _G.Settings.AutoRaid = v
+    if v then _G.Settings.AutoFarm = false end
+end})
 
-CombatTab:CreateToggle({
-    Name = "Auto Raid Kill",
-    CurrentValue = false,
-    Flag = "AutoRaid",
-    Callback = function(v)
-        Settings.AutoRaid = v
-        if v then Settings.AutoFarm = false end
-    end,
+CombatTab:CreateDropdown({
+    Name = "Target Type",
+    Options = {"All", "Normal", "MiniBoss", "RaidBoss"},
+    CurrentOption = {"All"},
+    Callback = function(selected) _G.Settings.TargetType = selected[1] end,
 })
 
 CombatTab:CreateSection("Settings")
-
-CombatTab:CreateSlider({
-    Name = "Farm Radius",
-    Range = {50, 500},
-    Increment = 10,
-    Suffix = "studs",
-    CurrentValue = 150,
-    Flag = "FarmRadius",
-    Callback = function(v)
-        Settings.FarmRadius = v
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Attack Range",
-    Range = {5, 50},
-    Increment = 1,
-    Suffix = "studs",
-    CurrentValue = 10,
-    Flag = "AttackRange",
-    Callback = function(v)
-        Settings.AttackRange = v
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Walk Speed",
-    Range = {16, 100},
-    Increment = 1,
-    Suffix = "speed",
-    CurrentValue = 50,
-    Flag = "WalkSpeed",
-    Callback = function(v)
-        Settings.WalkSpeed = v
-        if Humanoid then Humanoid.WalkSpeed = v end
-    end,
-})
+CombatTab:CreateSlider({Name = "Farm Radius", Range = {50, 500}, Increment = 10, CurrentValue = 200, Callback = function(v) _G.Settings.FarmRadius = v end})
+CombatTab:CreateSlider({Name = "Hover Height", Range = {5, 25}, Increment = 1, CurrentValue = 10, Callback = function(v) _G.Settings.HoverHeight = v end})
+CombatTab:CreateSlider({Name = "Walk Speed", Range = {16, 120}, Increment = 1, CurrentValue = 60, Callback = function(v) _G.Settings.WalkSpeed = v end})
 
 SkillsTab:CreateSection("Auto Skills")
+for _, k in ipairs({"R","F","C","X","T"}) do
+    SkillsTab:CreateToggle({Name = "Auto Skill "..k, Callback = function(v) _G.Settings["AutoSkill"..k] = v end})
+end
+SkillsTab:CreateSlider({Name = "Skill Delay", Range = {1, 30}, Increment = 1, Suffix = "x0.1s", CurrentValue = 8, Callback = function(v) _G.Settings.SkillDelay = v * 0.1 end})
 
-SkillsTab:CreateToggle({
-    Name = "Auto Skill R",
-    CurrentValue = false,
-    Flag = "AutoSkillR",
-    Callback = function(v) Settings.AutoSkillR = v end,
-})
+print("[JJZ] UI Loaded!")
 
-SkillsTab:CreateToggle({
-    Name = "Auto Skill F",
-    CurrentValue = false,
-    Flag = "AutoSkillF",
-    Callback = function(v) Settings.AutoSkillF = v end,
-})
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Settings = _G.Settings
 
-SkillsTab:CreateToggle({
-    Name = "Auto Skill C",
-    CurrentValue = false,
-    Flag = "AutoSkillC",
-    Callback = function(v) Settings.AutoSkillC = v end,
-})
+local Character, HRP, Humanoid
 
-SkillsTab:CreateToggle({
-    Name = "Auto Skill X",
-    CurrentValue = false,
-    Flag = "AutoSkillX",
-    Callback = function(v) Settings.AutoSkillX = v end,
-})
+local function UpdateChar()
+    Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    HRP = Character:WaitForChild("HumanoidRootPart")
+    Humanoid = Character:WaitForChild("Humanoid")
+    Humanoid.WalkSpeed = Settings.WalkSpeed
+end
+UpdateChar()
+LocalPlayer.CharacterAdded:Connect(UpdateChar)
 
-SkillsTab:CreateToggle({
-    Name = "Auto Skill T",
-    CurrentValue = false,
-    Flag = "AutoSkillT",
-    Callback = function(v) Settings.AutoSkillT = v end,
-})
-
-SkillsTab:CreateSlider({
-    Name = "Skill Delay",
-    Range = {1, 30},
-    Increment = 1,
-    Suffix = "x10ms",
-    CurrentValue = 5,
-    Flag = "SkillDelay",
-    Callback = function(v)
-        Settings.SkillDelay = v / 10
-    end,
-})
-
-local function GetDistance(p1, p2)
-    return (p1 - p2).Magnitude
+-- Auto Equip Tool
+local function EquipTool()
+    local tool = Character:FindFirstChildOfClass("Tool")
+    if not tool then
+        for _, v in ipairs(Character:GetChildren()) do
+            if v:IsA("Tool") then v.Parent = Character; break end
+        end
+    end
 end
 
-local function IsEnemy(model)
-    if not model:FindFirstChild("Humanoid") then return false end
-    if not model:FindFirstChild("HumanoidRootPart") then return false end
-    if model == Character then return false end
-    if Players:GetPlayerFromCharacter(model) then return false end
+-- Enemy Detection (Jujutsu Zero specific)
+local function IsValidEnemy(model)
+    if not model or not model:FindFirstChild("Humanoid") or not model:FindFirstChild("HumanoidRootPart") then return false end
+    if model == Character or Players:GetPlayerFromCharacter(model) then return false end
     if model.Humanoid.Health <= 0 then return false end
     return true
 end
 
 local function GetNearestEnemy()
-    local nearest, shortest = nil, Settings.FarmRadius
-    for _, model in ipairs(workspace:GetDescendants()) do
-        if model:IsA("Model") and IsEnemy(model) then
-            local d = GetDistance(HumanoidRootPart.Position, model.HumanoidRootPart.Position)
-            if d < shortest then shortest = d; nearest = model end
+    local nearest, dist = nil, Settings.FarmRadius
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if not v:IsA("Model") then continue end
+        local name = v.Name:lower()
+        local valid = false
+        local t = Settings.TargetType
+
+        if t == "All" then
+            valid = IsValidEnemy(v)
+        elseif t == "Normal" then
+            valid = IsValidEnemy(v) and not (name:find("boss") or name:find("raid") or name:find("remnant"))
+        elseif t == "MiniBoss" then
+            valid = IsValidEnemy(v) and (name:find("remnant") or name:find("mini") or name:find("elite"))
+        elseif t == "RaidBoss" then
+            valid = IsValidEnemy(v) and (name:find("raid") or name:find("jogo") or name:find("toji") or name:find("sukuna") or name:find("hajime"))
+        end
+
+        if valid then
+            local d = (HRP.Position - v.HumanoidRootPart.Position).Magnitude
+            if d < dist then
+                dist = d
+                nearest = v
+            end
         end
     end
     return nearest
 end
 
-local function AttackEnemy(enemy)
-    if not enemy or not enemy.Parent then return end
-    if not enemy:FindFirstChild("HumanoidRootPart") then return end
-    if enemy.Humanoid.Health <= 0 then return end
-    local dist = GetDistance(HumanoidRootPart.Position, enemy.HumanoidRootPart.Position)
-    if dist > Settings.AttackRange then
-        Humanoid:MoveTo(enemy.HumanoidRootPart.Position)
-    else
-        local RS = game:GetService("ReplicatedStorage")
-        local remote = RS:FindFirstChild("AttackRemote")
-            or RS:FindFirstChild("Attack")
-            or RS:FindFirstChild("Hit")
-            or RS:FindFirstChild("DealDamage")
-        if remote then pcall(function() remote:FireServer(enemy) end) end
-        local tool = Character:FindFirstChildOfClass("Tool")
-        if tool then pcall(function() tool:Activate() end) end
-    end
+-- Improved Hover for Delta
+local function HoverOnEnemy(enemy)
+    if not enemy or not enemy:FindFirstChild("HumanoidRootPart") then return end
+    local targetPos = enemy.HumanoidRootPart.Position + Vector3.new(0, Settings.HoverHeight, 0)
+    
+    HRP.CFrame = CFrame.new(targetPos, enemy.HumanoidRootPart.Position)
+    
+    -- Extra stability
+    local vel = Instance.new("BodyVelocity")
+    vel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    vel.Velocity = Vector3.new(0, 5, 0)
+    vel.Parent = HRP
+    game:GetService("Debris"):AddItem(vel, 0.2)
 end
 
-local function DoRaidKill()
-    local enemies = {}
-    for _, model in ipairs(workspace:GetDescendants()) do
-        if model:IsA("Model") and IsEnemy(model) then
-            table.insert(enemies, model)
+-- Attack
+local function ClickAttack()
+    EquipTool()
+    local tool = Character:FindFirstChildOfClass("Tool")
+    if tool then
+        pcall(function() tool:Activate() end)
+        
+        for _, desc in ipairs(tool:GetDescendants()) do
+            if desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction") then
+                pcall(function() desc:FireServer() end)
+            end
         end
     end
-    if #enemies == 0 then return end
-    table.sort(enemies, function(a, b)
-        return GetDistance(HumanoidRootPart.Position, a.HumanoidRootPart.Position)
-             < GetDistance(HumanoidRootPart.Position, b.HumanoidRootPart.Position)
+
+    -- Mouse click simulation (Delta reliable)
+    pcall(function()
+        local VIM = game:GetService("VirtualInputManager")
+        VIM:SendMouseButtonEvent(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y/2, 0, true, game, 1)
+        task.wait(0.04)
+        VIM:SendMouseButtonEvent(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y/2, 0, false, game, 1)
     end)
-    local target = enemies[1]
-    if target and target.Humanoid.Health > 0 then AttackEnemy(target) end
 end
 
-local VIM = game:GetService("VirtualInputManager")
+local function AttackEnemy(enemy)
+    if not enemy then return end
+    HoverOnEnemy(enemy)
+    task.wait(0.1)
+    ClickAttack()
+end
+
+-- Skills
+local function SimulateKey(keyCode)
+    pcall(function()
+        local VIM = game:GetService("VirtualInputManager")
+        VIM:SendKeyEvent(true, keyCode, false, game)
+        task.wait(0.06)
+        VIM:SendKeyEvent(false, keyCode, false, game)
+    end)
+end
+
 local SkillKeys = {
-    { key = "AutoSkillR", code = Enum.KeyCode.R },
-    { key = "AutoSkillF", code = Enum.KeyCode.F },
-    { key = "AutoSkillC", code = Enum.KeyCode.C },
-    { key = "AutoSkillX", code = Enum.KeyCode.X },
-    { key = "AutoSkillT", code = Enum.KeyCode.T },
+    {key = "AutoSkillR", code = Enum.KeyCode.R},
+    {key = "AutoSkillF", code = Enum.KeyCode.F},
+    {key = "AutoSkillC", code = Enum.KeyCode.C},
+    {key = "AutoSkillX", code = Enum.KeyCode.X},
+    {key = "AutoSkillT", code = Enum.KeyCode.T},
 }
+
 local lastSkillTime = {}
 for _, s in ipairs(SkillKeys) do lastSkillTime[s.key] = 0 end
 
@@ -220,38 +183,31 @@ local function FireSkills()
     for _, s in ipairs(SkillKeys) do
         if Settings[s.key] and (now - lastSkillTime[s.key]) >= Settings.SkillDelay then
             lastSkillTime[s.key] = now
-            pcall(function()
-                VIM:SendKeyEvent(true, s.code, false, game)
-                task.wait(0.05)
-                VIM:SendKeyEvent(false, s.code, false, game)
-            end)
+            SimulateKey(s.code)
         end
     end
 end
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
-    Humanoid = char:WaitForChild("Humanoid")
-    Humanoid.WalkSpeed = Settings.WalkSpeed
-end)
+-- Main Loops
+task.spawn(function()
+    while true do
+        task.wait(0.08)
+        if not HRP or Humanoid.Health <= 0 then continue end
 
-Humanoid.WalkSpeed = Settings.WalkSpeed
-
-RunService.Heartbeat:Connect(function()
-    if not Character or not Humanoid then return end
-    if Humanoid.Health <= 0 then return end
-    if Settings.AutoFarm then
-        local enemy = GetNearestEnemy()
-        if enemy then AttackEnemy(enemy) end
-    elseif Settings.AutoRaid then
-        DoRaidKill()
+        if Settings.AutoFarm or Settings.AutoRaid then
+            local enemy = GetNearestEnemy()
+            if enemy then
+                AttackEnemy(enemy)
+            end
+        end
     end
-    FireSkills()
 end)
 
-Rayfield:Notify({
-    Title = "JJZ AutoFarm",
-    Content = "Loaded successfully!",
-    Duration = 5,
-})
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        FireSkills()
+    end
+end)
+
+print("[JJZ] Logic Loaded for Jujutsu Zero! (Delta Optimized)")
