@@ -19,31 +19,38 @@ local EnemyDropdown
 
 local function IsRealEnemy(model)
     if not model or not model:IsA("Model") then return false end
-    local nameLower = model.Name:lower()
 
-    -- Skip players (_Client suffix)
-    if nameLower:find("_client") then return false end
-
-    -- Skip known NPC/trainer/quest givers by name
-    local badKeywords = {
-        "quest", "trainer", "shop", "vendor", "exchange",
-        "learn", "count", "upgrade", "tree", "todo",
-        "yuji", "inumaki", "yuki", "gojo", "nobara",
-        "path", "vitality", "sorcery", "physical",
-        "blackflash", "tracksuit", "client", "server",
-        "camera", "effect", "particle", "baseplate", "spawn",
-        "awakener", "awakening", "focuspath"
+    -- ALLOWLIST ONLY - must match a known enemy name
+    local allowedKeywords = {
+        "upper year student",
+        "curse",
+        "remnant",
+        "transfigured",
+        "special grade",
+        "grade 1",
+        "grade 2",
+        "grade 3",
+        "semi grade",
+        "boss",
+        "raid"
     }
-    for _, kw in ipairs(badKeywords) do
-        if nameLower:find(kw) then return false end
+
+    local nameLower = model.Name:lower()
+    local allowed = false
+    for _, kw in ipairs(allowedKeywords) do
+        if nameLower:find(kw) then
+            allowed = true
+            break
+        end
     end
+    if not allowed then return false end
 
     -- Must have Humanoid + HRP with health > 0
     local hum = model:FindFirstChildWhichIsA("Humanoid")
     local hrp = model:FindFirstChild("HumanoidRootPart")
     if not (hum and hrp and hum.Health > 0) then return false end
 
-    -- Skip actual players (double check)
+    -- Skip actual players just in case
     if game.Players:GetPlayerFromCharacter(model) then return false end
     if model == game.Players.LocalPlayer.Character then return false end
 
