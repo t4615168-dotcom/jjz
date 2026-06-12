@@ -9,7 +9,7 @@ _G.Settings = {
     SelectedEnemy = nil
 }
 
-local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm - Strict Enemy", LoadingTitle = "Loading...", Theme = "Default"})
+local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm", LoadingTitle = "Loading...", Theme = "Default"})
 
 local CombatTab = Window:CreateTab("Combat")
 local SkillsTab = Window:CreateTab("Skills")
@@ -17,40 +17,33 @@ local SkillsTab = Window:CreateTab("Skills")
 local EnemyList = {}
 local EnemyDropdown
 
+local allowedKeywords = {
+    "upper year student",
+    "curse",
+    "remnant",
+    "transfigured",
+    "special grade",
+    "grade 1",
+    "grade 2",
+    "grade 3",
+    "semi grade",
+    "boss",
+    "raid"
+}
+
 local function IsRealEnemy(model)
     if not model or not model:IsA("Model") then return false end
-
-    -- ALLOWLIST ONLY - must match a known enemy name
-    local allowedKeywords = {
-        "upper year student",
-        "curse",
-        "remnant",
-        "transfigured",
-        "special grade",
-        "grade 1",
-        "grade 2",
-        "grade 3",
-        "semi grade",
-        "boss",
-        "raid"
-    }
-
     local nameLower = model.Name:lower()
+
     local allowed = false
     for _, kw in ipairs(allowedKeywords) do
-        if nameLower:find(kw) then
-            allowed = true
-            break
-        end
+        if nameLower:find(kw) then allowed = true break end
     end
     if not allowed then return false end
 
-    -- Must have Humanoid + HRP with health > 0
     local hum = model:FindFirstChildWhichIsA("Humanoid")
     local hrp = model:FindFirstChild("HumanoidRootPart")
     if not (hum and hrp and hum.Health > 0) then return false end
-
-    -- Skip actual players just in case
     if game.Players:GetPlayerFromCharacter(model) then return false end
     if model == game.Players.LocalPlayer.Character then return false end
 
@@ -63,42 +56,23 @@ local function RefreshEnemies()
     local LocalCharacter = game.Players.LocalPlayer.Character
     local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
 
-    print("[JJZ] Scanning by Humanoid...")
+    print("[JJZ] Scanning with allowlist...")
 
-    for _, hum in ipairs(workspace:GetDescendants()) do
-        if hum:IsA("Humanoid") and hum.Health > 0 then
-            local model = hum.Parent
-            if not model then continue end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if IsRealEnemy(obj) then
+            local hrp = obj:FindFirstChild("HumanoidRootPart")
+            local dist = (LocalHRP and hrp) and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
+            local display = obj.Name .. " (" .. dist .. "m)"
 
-            -- Skip players
-            if game.Players:GetPlayerFromCharacter(model) then continue end
-            if model == LocalCharacter then continue end
-
-            local hrp = model:FindFirstChild("HumanoidRootPart")
-            if not hrp then continue end
-
-            -- Skip junk
-            local nameLower = model.Name:lower()
-            local badKeywords = {"visual", "camera", "effect", "particle", "baseplate", "spawn", "vendor", "shop"}
-            local skip = false
-            for _, kw in ipairs(badKeywords) do
-                if nameLower:find(kw) then skip = true break end
-            end
-            if skip then continue end
-
-            local dist = LocalHRP and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
-            local display = model.Name .. " (" .. dist .. "m)"
-
-            -- Avoid duplicates
             local duplicate = false
             for _, e in ipairs(EnemyList) do
-                if e.Model == model then duplicate = true break end
+                if e.Model == obj then duplicate = true break end
             end
             if duplicate then continue end
 
-            table.insert(EnemyList, {Model = model, Display = display})
+            table.insert(EnemyList, {Model = obj, Display = display})
             table.insert(names, display)
-            print("[JJZ] ✅ Found: " .. model.Name .. " | " .. dist .. "m")
+            print("[JJZ] ✅ Found: " .. obj.Name .. " | " .. dist .. "m")
         end
     end
 
@@ -157,7 +131,6 @@ SkillsTab:CreateSlider({Name = "Skill Delay", Range={5,30}, CurrentValue=9, Suff
 
 print("[JJZ] UI Loaded!")
 
--- Services & character setup
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Settings = _G.Settings
@@ -201,7 +174,6 @@ local function SimulateKey(keyCode)
     end)
 end
 
--- Auto Farm loop
 task.spawn(function()
     while true do
         task.wait(0.25)
@@ -217,7 +189,6 @@ task.spawn(function()
     end
 end)
 
--- Auto Skills loop
 task.spawn(function()
     while true do
         task.wait(0.1)
