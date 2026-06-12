@@ -9,7 +9,7 @@ _G.Settings = {
     SelectedEnemy = nil
 }
 
-local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm - Upper Year Fix", LoadingTitle = "Loading...", Theme = "Default"})
+local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm - Enemy Only", LoadingTitle = "Loading...", Theme = "Default"})
 
 local CombatTab = Window:CreateTab("Combat")
 local SkillsTab = Window:CreateTab("Skills")
@@ -17,21 +17,31 @@ local SkillsTab = Window:CreateTab("Skills")
 local EnemyList = {}
 local EnemyDropdown
 
-local function IsValidEnemy(model)
+local function IsRealEnemy(model)
     if not model or not model:IsA("Model") then return false end
     
-    local nameLower = model.Name:lower()
-    -- Keep only likely enemies
-    if nameLower:find("visual") or nameLower:find("default_client") or nameLower:find("camera") or 
-       nameLower:find("effect") or nameLower:find("particle") or nameLower:find("map") then
-        return false
+    local name = model.Name:lower()
+    local LocalPlayer = game.Players.LocalPlayer
+    
+    -- Exclude players
+    if game.Players:GetPlayerFromCharacter(model) then return false end
+    
+    -- Exclude common quest NPCs / friendly NPCs
+    local npcExclude = {"quest", "vendor", "shop", "teacher", "npc", "trainer", "civilian", "student", "upper year student"}
+    for _, word in ipairs(npcExclude) do
+        if name:find(word) then 
+            -- Exception: Keep "Upper Year Student" as enemy
+            if name:find("upper year student") then
+                return true
+            end
+            return false 
+        end
     end
     
     local hum = model:FindFirstChild("Humanoid")
     local hrp = model:FindFirstChild("HumanoidRootPart")
     
     if hum and hrp and hum.Health > 0 then
-        -- Extra check for quest enemies like Upper Year Student
         return true
     end
     return false
@@ -43,34 +53,33 @@ local function RefreshEnemies()
     local LocalCharacter = game.Players.LocalPlayer.Character
     local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
     
-    print("[JJZ] Starting deep scan for Upper Year Student...")
+    print("[JJZ] Scanning for REAL enemies only...")
 
     for _, model in ipairs(workspace:GetDescendants()) do
-        if IsValidEnemy(model) and model ~= LocalCharacter then
+        if IsRealEnemy(model) and model ~= LocalCharacter then
             local dist = LocalHRP and math.floor((LocalHRP.Position - model.HumanoidRootPart.Position).Magnitude) or 0
             local display = model.Name .. " (" .. dist .. "m)"
             
             table.insert(EnemyList, {Model = model, Display = display})
             table.insert(names, display)
             
-            if model.Name:lower():find("upper") or model.Name:lower():find("student") then
-                print("[JJZ] FOUND QUEST ENEMY: " .. model.Name)
+            if model.Name:lower():find("upper") then
+                print("[JJZ] ✅ Detected Enemy: " .. model.Name)
             end
         end
     end
     
-    table.sort(names)  -- Sort alphabetically
+    table.sort(names)
     
     if EnemyDropdown then
         EnemyDropdown:Refresh(names, true)
     end
-    
-    print("[JJZ] Total valid targets found: " .. #EnemyList)
+    print("[JJZ] Total REAL enemies found: " .. #EnemyList)
 end
 
 CombatTab:CreateSection("Enemy Selection")
 CombatTab:CreateButton({
-    Name = "🔄 Refresh Enemies (Upper Year Student Fix)",
+    Name = "🔄 Refresh Enemies (Only Real Enemies)",
     Callback = RefreshEnemies
 })
 
@@ -85,7 +94,7 @@ EnemyDropdown = CombatTab:CreateDropdown({
             for _, e in ipairs(EnemyList) do
                 if e.Display == sel then
                     _G.Settings.SelectedEnemy = e.Model
-                    print("[JJZ] ✅ Selected: " .. sel)
+                    print("[JJZ] ✅ Selected Enemy: " .. sel)
                     return
                 end
             end
@@ -114,7 +123,7 @@ for _,k in {"R","F","C","X","T"} do
 end
 SkillsTab:CreateSlider({Name = "Skill Delay", Range={5,30}, CurrentValue=9, Suffix="x0.1s", Callback=function(v) _G.Settings.SkillDelay = v*0.1 end})
 
-print("[JJZ] UI Loaded - Upper Year Student Detection Active!")
+print("[JJZ] UI Loaded - Real Enemy Only Mode!")
 
 -- Services & Character
 local Players = game:GetService("Players")
@@ -192,4 +201,4 @@ task.spawn(function()
     end
 end)
 
-print("[JJZ] Test: Accept quest → Refresh Enemies")
+print("[JJZ] Accept quest → Click Refresh")
