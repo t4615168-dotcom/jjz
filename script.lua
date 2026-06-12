@@ -10,7 +10,7 @@ _G.Settings = {
     SelectedEnemy = nil
 }
 
-local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm - Quest Enemies", LoadingTitle = "Loading...", Theme = "Default"})
+local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm - Quest Fix", LoadingTitle = "Loading...", Theme = "Default"})
 
 local CombatTab = Window:CreateTab("Combat")
 local SkillsTab = Window:CreateTab("Skills")
@@ -18,27 +18,19 @@ local SkillsTab = Window:CreateTab("Skills")
 local EnemyList = {}
 local EnemyDropdown
 
-local function GetAllPossibleEnemies()
-    local enemies = {}
+local function IsValidEnemyModel(model)
+    if not model or not model:IsA("Model") then return false end
+    local name = model.Name:lower()
     
-    -- Priority folders (common in Jujutsu games)
-    local priorityFolders = {"Enemies", "Mobs", "Curses", "Spawned", "QuestEnemies", "RaidEnemies", "Bosses"}
-    
-    for _, folderName in ipairs(priorityFolders) do
-        local folder = workspace:FindFirstChild(folderName) or workspace:FindFirstChild(folderName:lower())
-        if folder then
-            for _, model in ipairs(folder:GetDescendants()) do
-                table.insert(enemies, model)
-            end
-        end
+    -- Filter out junk
+    if name:find("visual") or name:find("default_client") or name:find("camera") or name:find("effect") then
+        return false
     end
     
-    -- Fallback: full workspace scan
-    for _, model in ipairs(workspace:GetDescendants()) do
-        table.insert(enemies, model)
-    end
+    local hum = model:FindFirstChild("Humanoid")
+    local hrp = model:FindFirstChild("HumanoidRootPart")
     
-    return enemies
+    return hum and hrp and hum.Health > 0
 end
 
 local function RefreshEnemies()
@@ -47,30 +39,31 @@ local function RefreshEnemies()
     local LocalCharacter = game.Players.LocalPlayer.Character
     local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
     
-    for _, model in ipairs(GetAllPossibleEnemies()) do
-        if model:IsA("Model") then
-            local hum = model:FindFirstChild("Humanoid")
-            local hrp = model:FindFirstChild("HumanoidRootPart")
+    -- Deep scan
+    for _, model in ipairs(workspace:GetDescendants()) do
+        if IsValidEnemyModel(model) and model ~= LocalCharacter then
+            local dist = LocalHRP and math.floor((LocalHRP.Position - model.HumanoidRootPart.Position).Magnitude) or 0
+            local display = model.Name .. " (" .. dist .. "m)"
             
-            if hum and hrp and hum.Health > 0 and model ~= LocalCharacter then
-                local dist = LocalHRP and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
-                local display = model.Name .. " (" .. dist .. "m)"
-                
-                table.insert(EnemyList, {Model = model, Display = display})
-                table.insert(names, display)
-            end
+            table.insert(EnemyList, {Model = model, Display = display})
+            table.insert(names, display)
         end
     end
+    
+    -- Sort by distance (closer first)
+    table.sort(EnemyList, function(a, b)
+        return a.Display < b.Display  -- simple sort by name+distance
+    end)
     
     if EnemyDropdown then
         EnemyDropdown:Refresh(names, true)
     end
-    print("[JJZ] Refreshed " .. #EnemyList .. " enemies (including quest spawns)")
+    print("[JJZ] Found " .. #EnemyList .. " valid enemies (including Upper Year Student)")
 end
 
 CombatTab:CreateSection("Enemy Selection")
 CombatTab:CreateButton({
-    Name = "🔄 Refresh Enemies (Quest + Normal)",
+    Name = "🔄 Refresh Enemies (Quest Fix)",
     Callback = RefreshEnemies
 })
 
@@ -114,9 +107,9 @@ for _,k in {"R","F","C","X","T"} do
 end
 SkillsTab:CreateSlider({Name = "Skill Delay", Range={5,30}, CurrentValue=9, Suffix="x0.1s", Callback=function(v) _G.Settings.SkillDelay = v*0.1 end})
 
-print("[JJZ] UI Loaded - Improved Quest Enemy Detection!")
+print("[JJZ] UI Loaded with Improved Detection!")
 
--- Services & Character
+-- Services
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Settings = _G.Settings
@@ -131,12 +124,11 @@ end
 UpdateChar()
 LocalPlayer.CharacterAdded:Connect(UpdateChar)
 
--- Get Target
 local function GetTargetEnemy()
     if Settings.SelectedEnemy and Settings.SelectedEnemy.Parent and Settings.SelectedEnemy:FindFirstChild("Humanoid") and Settings.SelectedEnemy.Humanoid.Health > 0 then
         return Settings.SelectedEnemy
     end
-    return nil -- You can keep fallback if you want
+    return nil
 end
 
 local function HoverOnEnemy(enemy)
@@ -193,4 +185,4 @@ task.spawn(function()
     end
 end)
 
-print("[JJZ] Ready! Accept a quest → Click Refresh Enemies")
+print("[JJZ] Ready! Accept quest → Refresh Enemies")
