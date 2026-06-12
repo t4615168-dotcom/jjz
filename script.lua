@@ -51,33 +51,50 @@ local function RefreshEnemies()
     local LocalCharacter = game.Players.LocalPlayer.Character
     local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
 
-    print("[JJZ] Scanning ALL workspace descendants for real enemies...")
+    print("[JJZ] Scanning by Humanoid...")
 
-    local scanned = 0
-    local function ScanModel(model)
-        if not model:IsA("Model") then return end
-        scanned += 1
-        if IsRealEnemy(model) then
+    for _, hum in ipairs(workspace:GetDescendants()) do
+        if hum:IsA("Humanoid") and hum.Health > 0 then
+            local model = hum.Parent
+            if not model then continue end
+
+            -- Skip players
+            if game.Players:GetPlayerFromCharacter(model) then continue end
+            if model == LocalCharacter then continue end
+
             local hrp = model:FindFirstChild("HumanoidRootPart")
-            local dist = (LocalHRP and hrp) and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
+            if not hrp then continue end
+
+            -- Skip junk
+            local nameLower = model.Name:lower()
+            local badKeywords = {"visual", "camera", "effect", "particle", "baseplate", "spawn", "vendor", "shop"}
+            local skip = false
+            for _, kw in ipairs(badKeywords) do
+                if nameLower:find(kw) then skip = true break end
+            end
+            if skip then continue end
+
+            local dist = LocalHRP and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
             local display = model.Name .. " (" .. dist .. "m)"
+
+            -- Avoid duplicates
+            local duplicate = false
+            for _, e in ipairs(EnemyList) do
+                if e.Model == model then duplicate = true break end
+            end
+            if duplicate then continue end
+
             table.insert(EnemyList, {Model = model, Display = display})
             table.insert(names, display)
-            print("[JJZ] ✅ Enemy: " .. model.Name .. " | Dist: " .. dist .. "m")
+            print("[JJZ] ✅ Found: " .. model.Name .. " | " .. dist .. "m")
         end
     end
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        ScanModel(obj)
-    end
-
     table.sort(names)
-
     if EnemyDropdown then
         EnemyDropdown:Refresh(names, true)
     end
-
-    print("[JJZ] Scan complete | Models checked: " .. scanned .. " | Enemies found: " .. #EnemyList)
+    print("[JJZ] Done | Enemies found: " .. #EnemyList)
 end
 
 CombatTab:CreateSection("Enemy Selection")
