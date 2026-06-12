@@ -21,11 +21,18 @@ local function IsRealEnemy(model)
     if not model or not model:IsA("Model") then return false end
     local nameLower = model.Name:lower()
 
-    -- Skip known junk/friendly/system objects
+    -- Skip players (_Client suffix)
+    if nameLower:find("_client") then return false end
+
+    -- Skip known NPC/trainer/quest givers by name
     local badKeywords = {
-        "visual", "camera", "effect", "particle", "map",
-        "shop", "vendor", "trainer", "civilian", "server",
-        "default_client", "baseplate", "spawn"
+        "quest", "trainer", "shop", "vendor", "exchange",
+        "learn", "count", "upgrade", "tree", "todo",
+        "yuji", "inumaki", "yuki", "gojo", "nobara",
+        "path", "vitality", "sorcery", "physical",
+        "blackflash", "tracksuit", "client", "server",
+        "camera", "effect", "particle", "baseplate", "spawn",
+        "awakener", "awakening", "focuspath"
     }
     for _, kw in ipairs(badKeywords) do
         if nameLower:find(kw) then return false end
@@ -36,10 +43,8 @@ local function IsRealEnemy(model)
     local hrp = model:FindFirstChild("HumanoidRootPart")
     if not (hum and hrp and hum.Health > 0) then return false end
 
-    -- Skip actual players
+    -- Skip actual players (double check)
     if game.Players:GetPlayerFromCharacter(model) then return false end
-
-    -- Skip local player's own character
     if model == game.Players.LocalPlayer.Character then return false end
 
     return true
