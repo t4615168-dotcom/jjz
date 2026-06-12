@@ -22,9 +22,9 @@ local function RefreshEnemies()
     local names = {}
 
     local LocalPlayer = game.Players.LocalPlayer
-    local LocalCharacter = workspace:FindFirstChild("Characters")
+    local clientFolder = workspace:FindFirstChild("Characters")
         and workspace.Characters:FindFirstChild("Client")
-        and workspace.Characters.Client:FindFirstChild(LocalPlayer.Name .. "_Client")
+    local LocalCharacter = clientFolder and clientFolder:FindFirstChild(LocalPlayer.Name .. "_Client")
     local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
 
     local npcsFolder = workspace:FindFirstChild("Characters")
@@ -38,28 +38,28 @@ local function RefreshEnemies()
 
     print("[JJZ] Scanning workspace.Characters.Server.NPCs...")
 
+    local count = 0
     for _, model in ipairs(npcsFolder:GetChildren()) do
         if not model:IsA("Model") then continue end
         local hum = model:FindFirstChildWhichIsA("Humanoid")
         local hrp = model:FindFirstChild("HumanoidRootPart")
         if not (hum and hrp and hum.Health > 0) then continue end
 
+        count += 1
         local dist = (LocalHRP and hrp) and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
+        local display = "Enemy " .. count .. " (" .. dist .. "m)"
 
-        local displayName = model.Name
-        local billboard = model:FindFirstChildWhichIsA("BillboardGui", true)
-        if billboard then
-            local label = billboard:FindFirstChildWhichIsA("TextLabel", true)
-            if label and label.Text ~= "" then
-                displayName = label.Text
-            end
-        end
-
-        local display = displayName .. " (" .. dist .. "m)"
         table.insert(EnemyList, {Model = model, Display = display})
         table.insert(names, display)
-        print("[JJZ] ✅ Found: " .. displayName .. " | " .. dist .. "m")
+        print("[JJZ] ✅ Found: " .. display .. " | HP: " .. hum.Health)
     end
+
+    table.sort(names)
+    if EnemyDropdown then
+        EnemyDropdown:Refresh(names, true)
+    end
+    print("[JJZ] Done | Enemies found: " .. #EnemyList)
+end
 
     table.sort(names)
     if EnemyDropdown then
@@ -131,9 +131,11 @@ local function UpdateChar()
     if not Character then
         Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     end
+    if not Character then print("[JJZ] ❌ Character not found!") return end
     HRP = Character:WaitForChild("HumanoidRootPart")
     Humanoid = Character:WaitForChild("Humanoid")
     Humanoid.WalkSpeed = Settings.WalkSpeed
+    print("[JJZ] ✅ Character found: " .. Character.Name)
 end
 UpdateChar()
 LocalPlayer.CharacterAdded:Connect(UpdateChar)
