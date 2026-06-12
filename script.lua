@@ -151,13 +151,26 @@ end
 
 local function HoverOnEnemy(enemy)
     if not enemy or not enemy:FindFirstChild("HumanoidRootPart") then return end
+    if not HRP then return end
     local pos = enemy.HumanoidRootPart.Position + Vector3.new(0, Settings.HoverHeight, -3)
-    HRP.CFrame = CFrame.new(pos, enemy.HumanoidRootPart.Position)
+    pcall(function()
+        HRP.CFrame = CFrame.new(pos, enemy.HumanoidRootPart.Position)
+    end)
 end
 
 local function ClickAttack()
-    local tool = Character:FindFirstChildOfClass("Tool")
-    if tool then pcall(function() tool:Activate() end) end
+    -- Try tool first
+    if Character then
+        local tool = Character:FindFirstChildOfClass("Tool")
+        if tool then pcall(function() tool:Activate() end) end
+    end
+    -- Also fire mouse click via input
+    pcall(function()
+        local VIM = game:GetService("VirtualInputManager")
+        VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+        task.wait(0.05)
+        VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+    end)
 end
 
 local function SimulateKey(keyCode)
@@ -172,7 +185,21 @@ end
 task.spawn(function()
     while true do
         task.wait(0.25)
-        if not HRP or Humanoid.Health <= 0 then continue end
+        if not HRP then continue end
+        if not Humanoid or Humanoid.Health <= 0 then
+            -- Try to re-find character
+            local clientFolder = workspace:FindFirstChild("Characters")
+                and workspace.Characters:FindFirstChild("Client")
+            if clientFolder then
+                local newChar = clientFolder:FindFirstChild(LocalPlayer.Name .. "_Client")
+                if newChar then
+                    Character = newChar
+                    HRP = Character:FindFirstChild("HumanoidRootPart")
+                    Humanoid = Character:FindFirstChild("Humanoid")
+                end
+            end
+            continue
+        end
         if Settings.AutoFarm or Settings.AutoRaid then
             local enemy = GetTargetEnemy()
             if enemy then
