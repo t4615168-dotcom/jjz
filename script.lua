@@ -17,11 +17,15 @@ local SkillsTab = Window:CreateTab("Skills")
 local EnemyList = {}
 local EnemyDropdown
 
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Settings = _G.Settings
+local Character, HRP, Humanoid
+
 local function RefreshEnemies()
     EnemyList = {}
     local names = {}
 
-    local LocalPlayer = game.Players.LocalPlayer
     local clientFolder = workspace:FindFirstChild("Characters")
         and workspace.Characters:FindFirstChild("Client")
     local LocalCharacter = clientFolder and clientFolder:FindFirstChild(LocalPlayer.Name .. "_Client")
@@ -53,13 +57,6 @@ local function RefreshEnemies()
         table.insert(names, display)
         print("[JJZ] ✅ Found: " .. display .. " | HP: " .. hum.Health)
     end
-
-    table.sort(names)
-    if EnemyDropdown then
-        EnemyDropdown:Refresh(names, true)
-    end
-    print("[JJZ] Done | Enemies found: " .. #EnemyList)
-end
 
     table.sort(names)
     if EnemyDropdown then
@@ -116,11 +113,6 @@ SkillsTab:CreateSlider({Name = "Skill Delay", Range={5,30}, CurrentValue=9, Suff
 
 print("[JJZ] UI Loaded!")
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Settings = _G.Settings
-
-local Character, HRP, Humanoid
 local function UpdateChar()
     task.wait(1)
     local clientFolder = workspace:FindFirstChild("Characters")
@@ -159,12 +151,10 @@ local function HoverOnEnemy(enemy)
 end
 
 local function ClickAttack()
-    -- Try tool first
     if Character then
         local tool = Character:FindFirstChildOfClass("Tool")
         if tool then pcall(function() tool:Activate() end) end
     end
-    -- Also fire mouse click via input
     pcall(function()
         local VIM = game:GetService("VirtualInputManager")
         VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
@@ -187,7 +177,6 @@ task.spawn(function()
         task.wait(0.25)
         if not HRP then continue end
         if not Humanoid or Humanoid.Health <= 0 then
-            -- Try to re-find character
             local clientFolder = workspace:FindFirstChild("Characters")
                 and workspace.Characters:FindFirstChild("Client")
             if clientFolder then
