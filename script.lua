@@ -5,12 +5,12 @@ _G.Settings = {
     AutoFarm = false, AutoRaid = false,
     AutoSkillR = false, AutoSkillF = false, AutoSkillC = false,
     AutoSkillX = false, AutoSkillT = false,
-    FarmRadius = 250, HoverHeight = 12, SkillDelay = 0.9, WalkSpeed = 55,
+    FarmRadius = 300, HoverHeight = 12, SkillDelay = 0.9, WalkSpeed = 55,
     TargetType = "All",
     SelectedEnemy = nil
 }
 
-local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm - Enemy Selector", LoadingTitle = "Loading...", Theme = "Default"})
+local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm - Quest Enemies", LoadingTitle = "Loading...", Theme = "Default"})
 
 local CombatTab = Window:CreateTab("Combat")
 local SkillsTab = Window:CreateTab("Skills")
@@ -18,13 +18,36 @@ local SkillsTab = Window:CreateTab("Skills")
 local EnemyList = {}
 local EnemyDropdown
 
+local function GetAllPossibleEnemies()
+    local enemies = {}
+    
+    -- Priority folders (common in Jujutsu games)
+    local priorityFolders = {"Enemies", "Mobs", "Curses", "Spawned", "QuestEnemies", "RaidEnemies", "Bosses"}
+    
+    for _, folderName in ipairs(priorityFolders) do
+        local folder = workspace:FindFirstChild(folderName) or workspace:FindFirstChild(folderName:lower())
+        if folder then
+            for _, model in ipairs(folder:GetDescendants()) do
+                table.insert(enemies, model)
+            end
+        end
+    end
+    
+    -- Fallback: full workspace scan
+    for _, model in ipairs(workspace:GetDescendants()) do
+        table.insert(enemies, model)
+    end
+    
+    return enemies
+end
+
 local function RefreshEnemies()
     EnemyList = {}
     local names = {}
     local LocalCharacter = game.Players.LocalPlayer.Character
     local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
     
-    for _, model in ipairs(workspace:GetDescendants()) do
+    for _, model in ipairs(GetAllPossibleEnemies()) do
         if model:IsA("Model") then
             local hum = model:FindFirstChild("Humanoid")
             local hrp = model:FindFirstChild("HumanoidRootPart")
@@ -42,12 +65,12 @@ local function RefreshEnemies()
     if EnemyDropdown then
         EnemyDropdown:Refresh(names, true)
     end
-    print("[JJZ] Successfully refreshed " .. #EnemyList .. " valid enemies")
+    print("[JJZ] Refreshed " .. #EnemyList .. " enemies (including quest spawns)")
 end
 
 CombatTab:CreateSection("Enemy Selection")
 CombatTab:CreateButton({
-    Name = "🔄 Refresh Enemies",
+    Name = "🔄 Refresh Enemies (Quest + Normal)",
     Callback = RefreshEnemies
 })
 
@@ -62,7 +85,7 @@ EnemyDropdown = CombatTab:CreateDropdown({
             for _, e in ipairs(EnemyList) do
                 if e.Display == selectedText then
                     _G.Settings.SelectedEnemy = e.Model
-                    print("[JJZ] Selected Enemy: " .. e.Display)
+                    print("[JJZ] Selected: " .. e.Display)
                     return
                 end
             end
@@ -80,15 +103,8 @@ CombatTab:CreateToggle({Name = "Auto Raid Kill (Use Selected)", CurrentValue = f
     if v then _G.Settings.AutoFarm = false end
 end})
 
-CombatTab:CreateDropdown({
-    Name = "Target Type (Fallback)",
-    Options = {"All","Normal","MiniBoss","RaidBoss"},
-    CurrentOption = {"All"},
-    Callback = function(s) _G.Settings.TargetType = s[1] end,
-})
-
 CombatTab:CreateSection("Settings")
-CombatTab:CreateSlider({Name = "Farm Radius", Range={50,400}, CurrentValue=250, Callback=function(v) _G.Settings.FarmRadius=v end})
+CombatTab:CreateSlider({Name = "Farm Radius", Range={50,500}, CurrentValue=300, Callback=function(v) _G.Settings.FarmRadius=v end})
 CombatTab:CreateSlider({Name = "Hover Height", Range={5,30}, CurrentValue=12, Callback=function(v) _G.Settings.HoverHeight=v end})
 CombatTab:CreateSlider({Name = "Walk Speed", Range={16,100}, CurrentValue=55, Callback=function(v) _G.Settings.WalkSpeed = v end})
 
@@ -98,7 +114,7 @@ for _,k in {"R","F","C","X","T"} do
 end
 SkillsTab:CreateSlider({Name = "Skill Delay", Range={5,30}, CurrentValue=9, Suffix="x0.1s", Callback=function(v) _G.Settings.SkillDelay = v*0.1 end})
 
-print("[JJZ] UI Loaded with Fixed Refresh!")
+print("[JJZ] UI Loaded - Improved Quest Enemy Detection!")
 
 -- Services & Character
 local Players = game:GetService("Players")
@@ -115,37 +131,12 @@ end
 UpdateChar()
 LocalPlayer.CharacterAdded:Connect(UpdateChar)
 
--- Get Target Enemy
+-- Get Target
 local function GetTargetEnemy()
     if Settings.SelectedEnemy and Settings.SelectedEnemy.Parent and Settings.SelectedEnemy:FindFirstChild("Humanoid") and Settings.SelectedEnemy.Humanoid.Health > 0 then
         return Settings.SelectedEnemy
     end
-    
-    -- Fallback to nearest
-    local nearest, dist = nil, Settings.FarmRadius
-    for _, model in ipairs(workspace:GetDescendants()) do
-        local hum = model:FindFirstChild("Humanoid")
-        local hrp = model:FindFirstChild("HumanoidRootPart")
-        if hum and hrp and model:IsA("Model") then
-            local name = model.Name:lower()
-            local valid = false
-            local t = Settings.TargetType
-            if t == "All" then valid = true
-            elseif t == "Normal" and not (name:find("boss") or name:find("raid") or name:find("remnant")) then valid = true
-            elseif t == "MiniBoss" and (name:find("remnant") or name:find("mini")) then valid = true
-            elseif t == "RaidBoss" and (name:find("raid") or name:find("jogo") or name:find("sukuna") or name:find("toji")) then valid = true
-            end
-
-            if valid and hum.Health > 0 and model ~= Character then
-                local d = (HRP.Position - hrp.Position).Magnitude
-                if d < dist then
-                    dist = d
-                    nearest = model
-                end
-            end
-        end
-    end
-    return nearest
+    return nil -- You can keep fallback if you want
 end
 
 local function HoverOnEnemy(enemy)
@@ -156,9 +147,7 @@ end
 
 local function ClickAttack()
     local tool = Character:FindFirstChildOfClass("Tool")
-    if tool then 
-        pcall(function() tool:Activate() end) 
-    end
+    if tool then pcall(function() tool:Activate() end) end
 end
 
 local function SimulateKey(keyCode)
@@ -170,17 +159,17 @@ local function SimulateKey(keyCode)
     end)
 end
 
--- Main Farm Loop (Slower to prevent spam)
+-- Main Loop
 task.spawn(function()
     while true do
-        task.wait(0.25)
+        task.wait(0.22)
         if not HRP or Humanoid.Health <= 0 then continue end
 
         if Settings.AutoFarm or Settings.AutoRaid then
             local enemy = GetTargetEnemy()
             if enemy then
                 HoverOnEnemy(enemy)
-                task.wait(0.15)
+                task.wait(0.12)
                 ClickAttack()
             end
         end
@@ -204,4 +193,4 @@ task.spawn(function()
     end
 end)
 
-print("[JJZ] Ready! Click Refresh Enemies near targets.")
+print("[JJZ] Ready! Accept a quest → Click Refresh Enemies")
