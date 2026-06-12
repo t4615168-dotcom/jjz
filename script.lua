@@ -15,22 +15,24 @@ local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm - Enemy Selector", Lo
 local CombatTab = Window:CreateTab("Combat")
 local SkillsTab = Window:CreateTab("Skills")
 
--- Enemy List
 local EnemyList = {}
 local EnemyDropdown
 
 local function RefreshEnemies()
     EnemyList = {}
     local names = {}
-    local LocalHRP = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local LocalCharacter = game.Players.LocalPlayer.Character
+    local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
     
     for _, model in ipairs(workspace:GetDescendants()) do
-        if model:IsA("Model") and model:FindFirstChild("Humanoid") and model:FindFirstChild("HumanoidRootPart") then
-            local name = model.Name
-            local lower = name:lower()
-            if model.Humanoid.Health > 0 and model ~= game.Players.LocalPlayer.Character then
-                local dist = LocalHRP and math.floor((LocalHRP.Position - model.HumanoidRootPart.Position).Magnitude) or 0
-                local display = name .. " (" .. dist .. "m)"
+        if model:IsA("Model") then
+            local hum = model:FindFirstChild("Humanoid")
+            local hrp = model:FindFirstChild("HumanoidRootPart")
+            
+            if hum and hrp and hum.Health > 0 and model ~= LocalCharacter then
+                local dist = LocalHRP and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
+                local display = model.Name .. " (" .. dist .. "m)"
+                
                 table.insert(EnemyList, {Model = model, Display = display})
                 table.insert(names, display)
             end
@@ -38,9 +40,9 @@ local function RefreshEnemies()
     end
     
     if EnemyDropdown then
-        EnemyDropdown:Refresh(names, true)  -- true = clear previous
+        EnemyDropdown:Refresh(names, true)
     end
-    print("[JJZ] Refreshed " .. #EnemyList .. " enemies")
+    print("[JJZ] Successfully refreshed " .. #EnemyList .. " valid enemies")
 end
 
 CombatTab:CreateSection("Enemy Selection")
@@ -60,7 +62,7 @@ EnemyDropdown = CombatTab:CreateDropdown({
             for _, e in ipairs(EnemyList) do
                 if e.Display == selectedText then
                     _G.Settings.SelectedEnemy = e.Model
-                    print("[JJZ] Selected: " .. e.Display)
+                    print("[JJZ] Selected Enemy: " .. e.Display)
                     return
                 end
             end
@@ -96,9 +98,9 @@ for _,k in {"R","F","C","X","T"} do
 end
 SkillsTab:CreateSlider({Name = "Skill Delay", Range={5,30}, CurrentValue=9, Suffix="x0.1s", Callback=function(v) _G.Settings.SkillDelay = v*0.1 end})
 
-print("[JJZ] UI Loaded!")
+print("[JJZ] UI Loaded with Fixed Refresh!")
 
--- Services
+-- Services & Character
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Settings = _G.Settings
@@ -113,15 +115,18 @@ end
 UpdateChar()
 LocalPlayer.CharacterAdded:Connect(UpdateChar)
 
--- Get Target
+-- Get Target Enemy
 local function GetTargetEnemy()
     if Settings.SelectedEnemy and Settings.SelectedEnemy.Parent and Settings.SelectedEnemy:FindFirstChild("Humanoid") and Settings.SelectedEnemy.Humanoid.Health > 0 then
         return Settings.SelectedEnemy
     end
-    -- Fallback nearest
+    
+    -- Fallback to nearest
     local nearest, dist = nil, Settings.FarmRadius
     for _, model in ipairs(workspace:GetDescendants()) do
-        if model:IsA("Model") and model:FindFirstChild("Humanoid") and model:FindFirstChild("HumanoidRootPart") then
+        local hum = model:FindFirstChild("Humanoid")
+        local hrp = model:FindFirstChild("HumanoidRootPart")
+        if hum and hrp and model:IsA("Model") then
             local name = model.Name:lower()
             local valid = false
             local t = Settings.TargetType
@@ -131,9 +136,12 @@ local function GetTargetEnemy()
             elseif t == "RaidBoss" and (name:find("raid") or name:find("jogo") or name:find("sukuna") or name:find("toji")) then valid = true
             end
 
-            if valid and model.Humanoid.Health > 0 and model ~= Character then
-                local d = (HRP.Position - model.HumanoidRootPart.Position).Magnitude
-                if d < dist then dist = d; nearest = model end
+            if valid and hum.Health > 0 and model ~= Character then
+                local d = (HRP.Position - hrp.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    nearest = model
+                end
             end
         end
     end
@@ -148,7 +156,9 @@ end
 
 local function ClickAttack()
     local tool = Character:FindFirstChildOfClass("Tool")
-    if tool then pcall(function() tool:Activate() end) end
+    if tool then 
+        pcall(function() tool:Activate() end) 
+    end
 end
 
 local function SimulateKey(keyCode)
@@ -160,17 +170,17 @@ local function SimulateKey(keyCode)
     end)
 end
 
--- Main Loop
+-- Main Farm Loop (Slower to prevent spam)
 task.spawn(function()
     while true do
-        task.wait(0.22)
+        task.wait(0.25)
         if not HRP or Humanoid.Health <= 0 then continue end
 
         if Settings.AutoFarm or Settings.AutoRaid then
             local enemy = GetTargetEnemy()
             if enemy then
                 HoverOnEnemy(enemy)
-                task.wait(0.12)
+                task.wait(0.15)
                 ClickAttack()
             end
         end
@@ -180,8 +190,7 @@ end)
 -- Skills Loop
 task.spawn(function()
     while true do
-        task.wait(0.08)
-        local now = tick()
+        task.wait(0.1)
         for _, s in ipairs({
             {k="AutoSkillR", c=Enum.KeyCode.R}, {k="AutoSkillF", c=Enum.KeyCode.F},
             {k="AutoSkillC", c=Enum.KeyCode.C}, {k="AutoSkillX", c=Enum.KeyCode.X},
@@ -195,4 +204,4 @@ task.spawn(function()
     end
 end)
 
-print("[JJZ] Enemy Selector Fixed! Click Refresh after spawning near enemies.")
+print("[JJZ] Ready! Click Refresh Enemies near targets.")
