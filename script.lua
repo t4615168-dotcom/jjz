@@ -24,21 +24,21 @@ local function RefreshEnemies()
     local LocalPlayer = game.Players.LocalPlayer
     local LocalCharacter = workspace:FindFirstChild("Characters")
         and workspace.Characters:FindFirstChild("Client")
-        and workspace.Characters.Client:FindFirstChild(LocalPlayer.Name)
+        and workspace.Characters.Client:FindFirstChild(LocalPlayer.Name .. "_Client")
     local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
 
-    local enemiesFolder = workspace:FindFirstChild("Container")
-        and workspace.Container:FindFirstChild("QuestAreas")
-        and workspace.Container.QuestAreas:FindFirstChild("Enemies")
+    local npcsFolder = workspace:FindFirstChild("Characters")
+        and workspace.Characters:FindFirstChild("Server")
+        and workspace.Characters.Server:FindFirstChild("NPCs")
 
-    if not enemiesFolder then
-        print("[JJZ] ❌ Enemies folder not found!")
+    if not npcsFolder then
+        print("[JJZ] ❌ NPCs folder not found!")
         return
     end
 
-    print("[JJZ] Scanning workspace.Container.QuestAreas.Enemies...")
+    print("[JJZ] Scanning workspace.Characters.Server.NPCs...")
 
-    for _, model in ipairs(enemiesFolder:GetChildren()) do
+    for _, model in ipairs(npcsFolder:GetChildren()) do
         if not model:IsA("Model") then continue end
         local hum = model:FindFirstChildWhichIsA("Humanoid")
         local hrp = model:FindFirstChild("HumanoidRootPart")
@@ -46,7 +46,6 @@ local function RefreshEnemies()
 
         local dist = (LocalHRP and hrp) and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
 
-        -- Try to get display name from BillboardGui, fallback to hash
         local displayName = model.Name
         local billboard = model:FindFirstChildWhichIsA("BillboardGui", true)
         if billboard then
@@ -57,7 +56,6 @@ local function RefreshEnemies()
         end
 
         local display = displayName .. " (" .. dist .. "m)"
-
         table.insert(EnemyList, {Model = model, Display = display})
         table.insert(names, display)
         print("[JJZ] ✅ Found: " .. displayName .. " | " .. dist .. "m")
@@ -125,9 +123,10 @@ local Settings = _G.Settings
 local Character, HRP, Humanoid
 local function UpdateChar()
     task.wait(1)
-    local charFolder = workspace:FindFirstChild("Characters")
-    if charFolder and charFolder:FindFirstChild("Client") then
-        Character = charFolder.Client:FindFirstChild(LocalPlayer.Name)
+    local clientFolder = workspace:FindFirstChild("Characters")
+        and workspace.Characters:FindFirstChild("Client")
+    if clientFolder then
+        Character = clientFolder:FindFirstChild(LocalPlayer.Name .. "_Client")
     end
     if not Character then
         Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
