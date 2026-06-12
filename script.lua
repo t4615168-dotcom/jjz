@@ -10,26 +10,53 @@ _G.Settings = {
 }
 
 local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm", LoadingTitle = "Loading...", Theme = "Default"})
-
 local CombatTab = Window:CreateTab("Combat")
 local SkillsTab = Window:CreateTab("Skills")
 
 local EnemyList = {}
 local EnemyDropdown
-
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Settings = _G.Settings
 local Character, HRP, Humanoid
 
+local function FindCharacter()
+    local clientFolder = workspace:FindFirstChild("Characters")
+        and workspace.Characters:FindFirstChild("Client")
+    if clientFolder then
+        local c = clientFolder:FindFirstChild(LocalPlayer.Name .. "_Client")
+        if c then return c end
+    end
+    return LocalPlayer.Character
+end
+
+local function UpdateChar()
+    local c = FindCharacter()
+    if not c then
+        task.wait(2)
+        c = FindCharacter()
+    end
+    if not c then print("[JJZ] ❌ Character not found!") return end
+    Character = c
+    HRP = Character:WaitForChild("HumanoidRootPart", 5)
+    Humanoid = Character:WaitForChild("Humanoid", 5)
+    if not HRP or not Humanoid then print("[JJZ] ❌ HRP/Humanoid not found!") return end
+    Humanoid.WalkSpeed = Settings.WalkSpeed
+    print("[JJZ] ✅ Character found: " .. Character.Name)
+end
+
+UpdateChar()
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    UpdateChar()
+end)
+
 local function RefreshEnemies()
     EnemyList = {}
     local names = {}
 
-    local clientFolder = workspace:FindFirstChild("Characters")
-        and workspace.Characters:FindFirstChild("Client")
-    local LocalCharacter = clientFolder and clientFolder:FindFirstChild(LocalPlayer.Name .. "_Client")
-    local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
+    local c = FindCharacter()
+    local LocalHRP = c and c:FindFirstChild("HumanoidRootPart")
 
     local npcsFolder = workspace:FindFirstChild("Characters")
         and workspace.Characters:FindFirstChild("Server")
@@ -66,10 +93,7 @@ local function RefreshEnemies()
 end
 
 CombatTab:CreateSection("Enemy Selection")
-CombatTab:CreateButton({
-    Name = "🔄 Refresh Enemies",
-    Callback = RefreshEnemies
-})
+CombatTab:CreateButton({Name = "🔄 Refresh Enemies", Callback = RefreshEnemies})
 
 EnemyDropdown = CombatTab:CreateDropdown({
     Name = "Select Target Enemy",
@@ -112,25 +136,6 @@ end
 SkillsTab:CreateSlider({Name = "Skill Delay", Range={5,30}, CurrentValue=9, Suffix="x0.1s", Callback=function(v) _G.Settings.SkillDelay = v*0.1 end})
 
 print("[JJZ] UI Loaded!")
-
-local function UpdateChar()
-    task.wait(1)
-    local clientFolder = workspace:FindFirstChild("Characters")
-        and workspace.Characters:FindFirstChild("Client")
-    if clientFolder then
-        Character = clientFolder:FindFirstChild(LocalPlayer.Name .. "_Client")
-    end
-    if not Character then
-        Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    end
-    if not Character then print("[JJZ] ❌ Character not found!") return end
-    HRP = Character:WaitForChild("HumanoidRootPart")
-    Humanoid = Character:WaitForChild("Humanoid")
-    Humanoid.WalkSpeed = Settings.WalkSpeed
-    print("[JJZ] ✅ Character found: " .. Character.Name)
-end
-UpdateChar()
-LocalPlayer.CharacterAdded:Connect(UpdateChar)
 
 local function GetTargetEnemy()
     if Settings.SelectedEnemy and Settings.SelectedEnemy.Parent
@@ -175,20 +180,11 @@ end
 task.spawn(function()
     while true do
         task.wait(0.25)
-        if not HRP then continue end
-        if not Humanoid or Humanoid.Health <= 0 then
-            local clientFolder = workspace:FindFirstChild("Characters")
-                and workspace.Characters:FindFirstChild("Client")
-            if clientFolder then
-                local newChar = clientFolder:FindFirstChild(LocalPlayer.Name .. "_Client")
-                if newChar then
-                    Character = newChar
-                    HRP = Character:FindFirstChild("HumanoidRootPart")
-                    Humanoid = Character:FindFirstChild("Humanoid")
-                end
-            end
+        if not HRP or not Humanoid then
+            UpdateChar()
             continue
         end
+        if Humanoid.Health <= 0 then continue end
         if Settings.AutoFarm or Settings.AutoRaid then
             local enemy = GetTargetEnemy()
             if enemy then
