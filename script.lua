@@ -17,63 +17,50 @@ local SkillsTab = Window:CreateTab("Skills")
 local EnemyList = {}
 local EnemyDropdown
 
-local allowedKeywords = {
-    "upper year student",
-    "curse",
-    "remnant",
-    "transfigured",
-    "special grade",
-    "grade 1",
-    "grade 2",
-    "grade 3",
-    "semi grade",
-    "boss",
-    "raid"
-}
-
-local function IsRealEnemy(model)
-    if not model or not model:IsA("Model") then return false end
-    local nameLower = model.Name:lower()
-
-    local allowed = false
-    for _, kw in ipairs(allowedKeywords) do
-        if nameLower:find(kw) then allowed = true break end
-    end
-    if not allowed then return false end
-
-    local hum = model:FindFirstChildWhichIsA("Humanoid")
-    local hrp = model:FindFirstChild("HumanoidRootPart")
-    if not (hum and hrp and hum.Health > 0) then return false end
-    if game.Players:GetPlayerFromCharacter(model) then return false end
-    if model == game.Players.LocalPlayer.Character then return false end
-
-    return true
-end
-
 local function RefreshEnemies()
     EnemyList = {}
     local names = {}
-    local LocalCharacter = game.Players.LocalPlayer.Character
+
+    local LocalPlayer = game.Players.LocalPlayer
+    local LocalCharacter = workspace:FindFirstChild("Characters")
+        and workspace.Characters:FindFirstChild("Client")
+        and workspace.Characters.Client:FindFirstChild(LocalPlayer.Name)
     local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
 
-    print("[JJZ] Scanning with allowlist...")
+    local enemiesFolder = workspace:FindFirstChild("Container")
+        and workspace.Container:FindFirstChild("QuestAreas")
+        and workspace.Container.QuestAreas:FindFirstChild("Enemies")
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if IsRealEnemy(obj) then
-            local hrp = obj:FindFirstChild("HumanoidRootPart")
-            local dist = (LocalHRP and hrp) and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
-            local display = obj.Name .. " (" .. dist .. "m)"
+    if not enemiesFolder then
+        print("[JJZ] ❌ Enemies folder not found!")
+        return
+    end
 
-            local duplicate = false
-            for _, e in ipairs(EnemyList) do
-                if e.Model == obj then duplicate = true break end
+    print("[JJZ] Scanning workspace.Container.QuestAreas.Enemies...")
+
+    for _, model in ipairs(enemiesFolder:GetChildren()) do
+        if not model:IsA("Model") then continue end
+        local hum = model:FindFirstChildWhichIsA("Humanoid")
+        local hrp = model:FindFirstChild("HumanoidRootPart")
+        if not (hum and hrp and hum.Health > 0) then continue end
+
+        local dist = (LocalHRP and hrp) and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
+
+        -- Try to get display name from BillboardGui, fallback to hash
+        local displayName = model.Name
+        local billboard = model:FindFirstChildWhichIsA("BillboardGui", true)
+        if billboard then
+            local label = billboard:FindFirstChildWhichIsA("TextLabel", true)
+            if label and label.Text ~= "" then
+                displayName = label.Text
             end
-            if duplicate then continue end
-
-            table.insert(EnemyList, {Model = obj, Display = display})
-            table.insert(names, display)
-            print("[JJZ] ✅ Found: " .. obj.Name .. " | " .. dist .. "m")
         end
+
+        local display = displayName .. " (" .. dist .. "m)"
+
+        table.insert(EnemyList, {Model = model, Display = display})
+        table.insert(names, display)
+        print("[JJZ] ✅ Found: " .. displayName .. " | " .. dist .. "m")
     end
 
     table.sort(names)
@@ -137,7 +124,14 @@ local Settings = _G.Settings
 
 local Character, HRP, Humanoid
 local function UpdateChar()
-    Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    task.wait(1)
+    local charFolder = workspace:FindFirstChild("Characters")
+    if charFolder and charFolder:FindFirstChild("Client") then
+        Character = charFolder.Client:FindFirstChild(LocalPlayer.Name)
+    end
+    if not Character then
+        Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    end
     HRP = Character:WaitForChild("HumanoidRootPart")
     Humanoid = Character:WaitForChild("Humanoid")
     Humanoid.WalkSpeed = Settings.WalkSpeed
