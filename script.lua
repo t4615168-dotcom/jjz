@@ -15,20 +15,22 @@ local Window = Rayfield:CreateWindow({Name = "JJZ AutoFarm - Enemy Selector", Lo
 local CombatTab = Window:CreateTab("Combat")
 local SkillsTab = Window:CreateTab("Skills")
 
--- Enemy List for Dropdown
+-- Enemy List
 local EnemyList = {}
 local EnemyDropdown
 
 local function RefreshEnemies()
     EnemyList = {}
     local names = {}
+    local LocalHRP = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     
     for _, model in ipairs(workspace:GetDescendants()) do
         if model:IsA("Model") and model:FindFirstChild("Humanoid") and model:FindFirstChild("HumanoidRootPart") then
             local name = model.Name
             local lower = name:lower()
             if model.Humanoid.Health > 0 and model ~= game.Players.LocalPlayer.Character then
-                local display = name .. " (" .. math.floor((game.Players.LocalPlayer.Character.HumanoidRootPart.Position - model.HumanoidRootPart.Position).Magnitude) .. "m)"
+                local dist = LocalHRP and math.floor((LocalHRP.Position - model.HumanoidRootPart.Position).Magnitude) or 0
+                local display = name .. " (" .. dist .. "m)"
                 table.insert(EnemyList, {Model = model, Display = display})
                 table.insert(names, display)
             end
@@ -36,7 +38,7 @@ local function RefreshEnemies()
     end
     
     if EnemyDropdown then
-        EnemyDropdown:Refresh(names)
+        EnemyDropdown:Refresh(names, true)  -- true = clear previous
     end
     print("[JJZ] Refreshed " .. #EnemyList .. " enemies")
 end
@@ -59,7 +61,7 @@ EnemyDropdown = CombatTab:CreateDropdown({
                 if e.Display == selectedText then
                     _G.Settings.SelectedEnemy = e.Model
                     print("[JJZ] Selected: " .. e.Display)
-                    break
+                    return
                 end
             end
         end
@@ -94,9 +96,9 @@ for _,k in {"R","F","C","X","T"} do
 end
 SkillsTab:CreateSlider({Name = "Skill Delay", Range={5,30}, CurrentValue=9, Suffix="x0.1s", Callback=function(v) _G.Settings.SkillDelay = v*0.1 end})
 
-print("[JJZ] UI Loaded with Enemy Selector!")
+print("[JJZ] UI Loaded!")
 
--- Services & Character
+-- Services
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Settings = _G.Settings
@@ -111,12 +113,12 @@ end
 UpdateChar()
 LocalPlayer.CharacterAdded:Connect(UpdateChar)
 
--- Get Target (Selected or Nearest)
+-- Get Target
 local function GetTargetEnemy()
     if Settings.SelectedEnemy and Settings.SelectedEnemy.Parent and Settings.SelectedEnemy:FindFirstChild("Humanoid") and Settings.SelectedEnemy.Humanoid.Health > 0 then
         return Settings.SelectedEnemy
     end
-    -- Fallback to nearest
+    -- Fallback nearest
     local nearest, dist = nil, Settings.FarmRadius
     for _, model in ipairs(workspace:GetDescendants()) do
         if model:IsA("Model") and model:FindFirstChild("Humanoid") and model:FindFirstChild("HumanoidRootPart") then
@@ -139,7 +141,7 @@ local function GetTargetEnemy()
 end
 
 local function HoverOnEnemy(enemy)
-    if not enemy then return end
+    if not enemy or not enemy:FindFirstChild("HumanoidRootPart") then return end
     local pos = enemy.HumanoidRootPart.Position + Vector3.new(0, Settings.HoverHeight, -3)
     HRP.CFrame = CFrame.new(pos, enemy.HumanoidRootPart.Position)
 end
@@ -193,4 +195,4 @@ task.spawn(function()
     end
 end)
 
-print("[JJZ] Enemy Selector Loaded! Use Refresh button then select from dropdown.")
+print("[JJZ] Enemy Selector Fixed! Click Refresh after spawning near enemies.")
