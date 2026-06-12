@@ -20,29 +20,28 @@ local EnemyDropdown
 local function IsRealEnemy(model)
     if not model or not model:IsA("Model") then return false end
     local nameLower = model.Name:lower()
-    
-    -- Hard exclude junk & friendly
-    local badKeywords = {"visual", "default_client", "camera", "effect", "particle", "map", "shop", "vendor", "npc", "quest", "trainer", "civilian", "server", "player"}
+
+    -- Skip known junk/friendly/system objects
+    local badKeywords = {
+        "visual", "camera", "effect", "particle", "map",
+        "shop", "vendor", "trainer", "civilian", "server",
+        "default_client", "baseplate", "spawn"
+    }
     for _, kw in ipairs(badKeywords) do
         if nameLower:find(kw) then return false end
     end
-    
-    -- Must have Humanoid + HRP and be hostile (not player)
-    local hum = model:FindFirstChild("Humanoid")
+
+    -- Must have Humanoid + HRP with health > 0
+    local hum = model:FindFirstChildWhichIsA("Humanoid")
     local hrp = model:FindFirstChild("HumanoidRootPart")
     if not (hum and hrp and hum.Health > 0) then return false end
+
+    -- Skip actual players
     if game.Players:GetPlayerFromCharacter(model) then return false end
-    
-    -- Allow known enemies
-    if nameLower:find("upper year student") or nameLower:find("curse") or nameLower:find("remnant") or nameLower:find("boss") or nameLower:find("raid") then
-        return true
-    end
-    
-    -- Only models with "Student" that are not friendly (adjust if needed)
-    if nameLower:find("student") and not nameLower:find("upper year student") then
-        return false
-    end
-    
+
+    -- Skip local player's own character
+    if model == game.Players.LocalPlayer.Character then return false end
+
     return true
 end
 
@@ -51,34 +50,39 @@ local function RefreshEnemies()
     local names = {}
     local LocalCharacter = game.Players.LocalPlayer.Character
     local LocalHRP = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
-    
-    print("[JJZ] Strict scan started - only real enemies...")
 
-    for _, model in ipairs(workspace:GetDescendants()) do
-        if IsRealEnemy(model) and model ~= LocalCharacter then
-            local dist = LocalHRP and math.floor((LocalHRP.Position - model.HumanoidRootPart.Position).Magnitude) or 0
+    print("[JJZ] Scanning ALL workspace descendants for real enemies...")
+
+    local scanned = 0
+    local function ScanModel(model)
+        if not model:IsA("Model") then return end
+        scanned += 1
+        if IsRealEnemy(model) then
+            local hrp = model:FindFirstChild("HumanoidRootPart")
+            local dist = (LocalHRP and hrp) and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 0
             local display = model.Name .. " (" .. dist .. "m)"
-            
             table.insert(EnemyList, {Model = model, Display = display})
             table.insert(names, display)
-            
-            if model.Name:lower():find("upper") or model.Name:lower():find("student") or model.Name:lower():find("curse") then
-                print("[JJZ] ✅ Real Enemy Detected: " .. model.Name)
-            end
+            print("[JJZ] ✅ Enemy: " .. model.Name .. " | Dist: " .. dist .. "m")
         end
     end
-    
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        ScanModel(obj)
+    end
+
     table.sort(names)
-    
+
     if EnemyDropdown then
         EnemyDropdown:Refresh(names, true)
     end
-    print("[JJZ] ✅ STRICT SCAN COMPLETE - Real enemies found: " .. #EnemyList)
+
+    print("[JJZ] Scan complete | Models checked: " .. scanned .. " | Enemies found: " .. #EnemyList)
 end
 
 CombatTab:CreateSection("Enemy Selection")
 CombatTab:CreateButton({
-    Name = "🔄 Refresh Enemies (STRICT - Only Real Enemies)",
+    Name = "🔄 Refresh Enemies",
     Callback = RefreshEnemies
 })
 
@@ -93,7 +97,7 @@ EnemyDropdown = CombatTab:CreateDropdown({
             for _, e in ipairs(EnemyList) do
                 if e.Display == sel then
                     _G.Settings.SelectedEnemy = e.Model
-                    print("[JJZ] ✅ Selected Real Enemy: " .. sel)
+                    print("[JJZ] ✅ Selected Enemy: " .. sel)
                     return
                 end
             end
@@ -117,14 +121,14 @@ CombatTab:CreateSlider({Name = "Hover Height", Range={5,30}, CurrentValue=12, Ca
 CombatTab:CreateSlider({Name = "Walk Speed", Range={16,100}, CurrentValue=55, Callback=function(v) _G.Settings.WalkSpeed = v end})
 
 SkillsTab:CreateSection("Auto Skills")
-for _,k in {"R","F","C","X","T"} do
+for _, k in ipairs({"R","F","C","X","T"}) do
     SkillsTab:CreateToggle({Name = "Auto Skill "..k, Callback = function(v) _G.Settings["AutoSkill"..k] = v end})
 end
 SkillsTab:CreateSlider({Name = "Skill Delay", Range={5,30}, CurrentValue=9, Suffix="x0.1s", Callback=function(v) _G.Settings.SkillDelay = v*0.1 end})
 
-print("[JJZ] UI Loaded - STRICT Enemy Filter Active!")
+print("[JJZ] UI Loaded!")
 
--- Rest of the script (services, loops, etc.) remains the same as previous version
+-- Services & character setup
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Settings = _G.Settings
@@ -140,7 +144,9 @@ UpdateChar()
 LocalPlayer.CharacterAdded:Connect(UpdateChar)
 
 local function GetTargetEnemy()
-    if Settings.SelectedEnemy and Settings.SelectedEnemy.Parent and Settings.SelectedEnemy:FindFirstChild("Humanoid") and Settings.SelectedEnemy.Humanoid.Health > 0 then
+    if Settings.SelectedEnemy and Settings.SelectedEnemy.Parent
+        and Settings.SelectedEnemy:FindFirstChild("Humanoid")
+        and Settings.SelectedEnemy.Humanoid.Health > 0 then
         return Settings.SelectedEnemy
     end
     return nil
@@ -166,6 +172,7 @@ local function SimulateKey(keyCode)
     end)
 end
 
+-- Auto Farm loop
 task.spawn(function()
     while true do
         task.wait(0.25)
@@ -181,12 +188,15 @@ task.spawn(function()
     end
 end)
 
+-- Auto Skills loop
 task.spawn(function()
     while true do
         task.wait(0.1)
         for _, s in ipairs({
-            {k="AutoSkillR", c=Enum.KeyCode.R}, {k="AutoSkillF", c=Enum.KeyCode.F},
-            {k="AutoSkillC", c=Enum.KeyCode.C}, {k="AutoSkillX", c=Enum.KeyCode.X},
+            {k="AutoSkillR", c=Enum.KeyCode.R},
+            {k="AutoSkillF", c=Enum.KeyCode.F},
+            {k="AutoSkillC", c=Enum.KeyCode.C},
+            {k="AutoSkillX", c=Enum.KeyCode.X},
             {k="AutoSkillT", c=Enum.KeyCode.T}
         }) do
             if Settings[s.k] then
@@ -197,4 +207,4 @@ task.spawn(function()
     end
 end)
 
-print("[JJZ] Accept quest → Refresh → Select ONLY real enemies")
+print("[JJZ] Accept quest → Refresh → Select enemy → Enable AutoFarm!")
