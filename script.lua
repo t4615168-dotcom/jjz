@@ -67,6 +67,34 @@ local function RefreshEnemies()
         return
     end
 
+    print("[JJZ] Scanning nearby NPCs (within " .. Settings.FarmRadius .. "m)...")
+
+    local count = 0
+    for _, model in ipairs(npcsFolder:GetChildren()) do
+        if not model:IsA("Model") then continue end
+        local hum = model:FindFirstChildWhichIsA("Humanoid")
+        local hrp = model:FindFirstChild("HumanoidRootPart")
+        if not (hum and hrp and hum.Health > 0) then continue end
+
+        -- ONLY include enemies within FarmRadius
+        local dist = LocalHRP and math.floor((LocalHRP.Position - hrp.Position).Magnitude) or 999999
+        if dist > Settings.FarmRadius then continue end
+
+        count += 1
+        local display = "Enemy " .. count .. " (" .. dist .. "m)"
+
+        table.insert(EnemyList, {Model = model, Display = display})
+        table.insert(names, display)
+        print("[JJZ] ✅ Found: " .. display .. " | HP: " .. hum.Health)
+    end
+
+    table.sort(names)
+    if EnemyDropdown then
+        EnemyDropdown:Refresh(names, true)
+    end
+    print("[JJZ] Done | Enemies found: " .. #EnemyList)
+end
+
     print("[JJZ] Scanning workspace.Characters.Server.NPCs...")
 
     local count = 0
